@@ -1,0 +1,43 @@
+#include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+#include <sensor_msgs/LaserScan.h>
+
+ros::Publisher velocity_pub;
+geometry_msgs::Twist move_cmd;
+
+float obstacle_distance_threshold = 0.2; // Set obstacle detection distance to 20 cm
+
+void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
+    int center_index = scan->ranges.size() / 2; // Center index of the laser scanner
+    int range_width = 5; // Number of measurements at the center (5 measurements)
+    bool obstacle_ahead = false;
+
+    for (int i = center_index - range_width; i <= center_index + range_width; ++i) {
+        if (scan->ranges[i] < obstacle_distance_threshold) {
+            obstacle_ahead = true;
+            break;
+        }
+    }
+
+    if (obstacle_ahead) {
+        move_cmd.linear.x = 0.05; // Slow forward if there is an obstacle
+        move_cmd.angular.z = ((rand() % 2 == 0) ? 1 : -1) * 0.5; // Random turn
+    } else {
+        move_cmd.linear.x = 0.2;  // Normal forward speed if no obstacle
+        move_cmd.angular.z = 0.0; // No turn
+    }
+    velocity_pub.publish(move_cmd);
+}
+
+int main(int argc, char** argv) {
+    ros::init(argc, argv, "turtlebot_advanced_explorer");
+    ros::NodeHandle nh;
+
+    srand(time(0)); // Seed for random number generation
+    velocity_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+    ros::Subscriber scan_sub = nh.subscribe("/scan", 10, scanCallback);
+
+    ros::spin(); // Continuously run the ROS loop
+
+    return 0;
+}
